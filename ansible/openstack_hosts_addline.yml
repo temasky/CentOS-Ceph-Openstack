@@ -1,0 +1,27 @@
+---
+- hosts: bonchvisors
+  remote_user: cephadmin
+  become: true
+  become_user: root
+  become_method: sudo
+
+  tasks:
+
+    - name: Add hosts entry
+      lineinfile:
+       path: /etc/hosts
+       line: "{{ item.hosts }}"
+      with_items:
+       - { hosts: '172.17.3.54 bonchvisor04' }
+       - { hosts: '172.17.3.55 bonchvisor05' }
+       - { hosts: '172.17.3.56 bonchvisor06' }
+       - { hosts: '172.17.3.57 bonchvisor07' }
+       - { hosts: '172.17.3.58 bonchvisor08' }
+       - { hosts: '172.17.3.59 bonchvisor09' }
+       - { hosts: '172.17.3.60 bonchvisor10' }
+       - { hosts: '172.17.3.61 bonchvisor11' }
+       - { hosts: '172.17.3.62 bonchvisor12' }
+       - { hosts: '172.17.3.63 bonchvisor13' }
+       - { hosts: '172.17.3.64 bonchvisor14' }
+       - { hosts: '172.17.3.50 controller-ceph' }
+       - { hosts: '172.17.3.100 controller-virt' }
