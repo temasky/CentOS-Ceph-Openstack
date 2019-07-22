@@ -1,0 +1,27 @@
+#!/usr/bin/python3.6
+import os
+import sys
+import re
+
+new_args = []
+flag = 0
+
+for i in range(1,len(sys.argv)+1):
+    if sys.argv[i-1] == "-cpu":
+        subargs = sys.argv[i].split(",")
+        if not ("kvm=off" in subargs): subargs.insert(1,"kvm=off")
+
+        for key in subargs:
+            if (re.findall('hv_vendor_id=.*', key).__len__()): flag = 1
+
+        if not flag: subargs.insert(2,"hv_vendor_id=Some_Coffee")
+
+        new_arg = ",".join(subargs)
+        new_args.append(new_arg)
+        continue
+    try:
+        new_args.append(sys.argv[i])
+    except IndexError:
+        pass
+
+os.execv('/usr/libexec/qemu-kvm.origin', new_args)
