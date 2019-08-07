@@ -14,3 +14,15 @@ SYNTAX:
 example:
 
 ``` #./create-journal-on-ssd.sh /dev/sde 10```
+
+### 2. create-journal-on-ssd-gpt.sh ###
+This script used for creating joudnal partitions (4 partitions hardcoded) on GPT drive, that alredy have other partition.
+
+
+SYNTAX:
+
+```create-journal-on-ssd-gpt.sh {device} {size in %}```
+
+example:
+
+``` #./create-journal-on-ssd-gpt.sh /dev/sde 10```
