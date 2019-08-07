@@ -1,0 +1,43 @@
+---
+- hosts: bonchvisors
+  remote_user: cephadmin
+  become: true
+  become_user: root
+  become_method: sudo
+  vars:
+   disk:
+     - sdb
+     - sdc
+     - sdd
+
+  tasks:
+
+#    - name: list variables
+#      debug:
+#       msg: "{{ item }}"
+#      loop: "{{ disk }}"
+
+   - name: wipe SSD
+     shell: wipefs -a /dev/sde
+     args:
+       executable: /bin/bash
+
+   - name: SSD to gpt
+     shell: parted -s /dev/sde mklabel gpt
+     args:
+       executable: /bin/bash
+
+   - name: create ssd {{disk[0]}} db partitions
+     shell: parted /dev/sde mkpart ceph-db-{{disk[0]}} ext2 0% 20%
+     args:
+       executable: /bin/bash
+
+   - name: create ssd {{disk[1]}} db partitions
+     shell: parted /dev/sde mkpart ceph-db-{{disk[1]}} ext2 20% 40%
+     args:
+       executable: /bin/bash
+
+   - name: create ssd {{disk[2]}} db partitions
+     shell: parted /dev/sde mkpart ceph-db-{{disk[2]}} ext2 40% 60%
+     args:
+       executable: /bin/bash

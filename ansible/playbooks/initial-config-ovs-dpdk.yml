@@ -1,0 +1,333 @@
+---
+- hosts: bonchvisor10
+  remote_user: cephadmin
+  become: true
+  become_user: root
+  become_method: sudo
+
+  tasks:
+
+  - name: install repos
+    yum:
+     name: "{{ packages }}"
+     state: latest
+    vars:
+     packages:
+     - epel-release
+     - https://rdoproject.org/repos/rdo-release.rpm
+     - https://download.ceph.com/rpm-luminous/el7/noarch/ceph-release-1-1.el7.noarch.rpm
+
+
+  - name: install initial components
+    yum:
+     name: "{{ packages }}"
+     state: latest
+    vars:
+     packages:
+     - net-tools
+     - chrony
+     - openvswitch
+     - qemu-kvm
+     - virt-install
+     - libvirt
+     - libvirt-python
+     - virt-manager
+     - policycoreutils-python
+     - libibverbs 
+     - driverctl
+     - libguestfs-tools
+     - python2-pip
+
+  - name: get public ip address
+    shell: echo 172.17.1.$((50+$(echo $HOSTNAME | awk -F "bonchvisor" '{print $2}' | sed 's/^0*//')))
+    args:
+     executable: /bin/bash
+    register: public_ip
+
+  - name: get private ip address
+    shell: echo 172.17.2.$((50+$(echo $HOSTNAME | awk -F "bonchvisor" '{print $2}' | sed 's/^0*//')))
+    args:
+     executable: /bin/bash
+    register: private_ip
+
+  - name: get tun ip address
+    shell: echo 172.17.3.$((50+$(echo $HOSTNAME | awk -F "bonchvisor" '{print $2}' | sed 's/^0*//')))
+    args:
+     executable: /bin/bash
+    register: tun_ip
+
+  - name: get first interface name
+    shell: "ip a | grep enp | awk 'NR==1{print $2}' | tr -d :"
+    args:
+     executable: /bin/bash
+    register: firstport
+
+  - name: get second interface name
+    shell: "ip a | grep enp | awk 'NR==2{print $2}' | tr -d :"
+    args:
+     executable: /bin/bash
+    register: secondport
+
+  - name: Add hosts entry
+    lineinfile:
+     path: /etc/hosts
+     line: "{{ item.hosts }}"
+    with_items:
+       - { hosts: '172.17.2.54 bonchvisor04' }
+       - { hosts: '172.17.2.55 bonchvisor05' }
+       - { hosts: '172.17.2.56 bonchvisor06' }
+       - { hosts: '172.17.2.57 bonchvisor07' }
+       - { hosts: '172.17.2.58 bonchvisor08' }
+       - { hosts: '172.17.2.59 bonchvisor09' }
+       - { hosts: '172.17.2.60 bonchvisor10' }
+       - { hosts: '172.17.2.61 bonchvisor11' }
+       - { hosts: '172.17.2.62 bonchvisor12' }
+       - { hosts: '172.17.2.50 controller-ceph' }
+       - { hosts: '172.17.2.100 controller-virt' }
+       - { hosts: '172.17.2.200 controller-net' }
+
+  - name: copy chrony file
+    copy:
+     src: /etc/ansible/files/chrony.conf
+     dest: /etc/chrony.conf
+     owner: root
+     group: root
+     mode: 0640
+
+  - name: insert uio_pci_generic module
+    shell: modprobe uio_pci_generic
+    args:
+     executable: /bin/bash
+
+  - name: copy uio_pci_generic module file to autostart
+    copy: src=/etc/ansible/files/dpdk.conf dest=/etc/modules-load.d/dpdk.conf owner=root group=root mode=0640
+
+  - name: detect dpdk interface name
+    shell: driverctl -v list-devices | grep -i net | grep 82576 | awk '{print $1}'
+    args:
+     executable: /bin/bash
+    register: dpdk_bus
+ 
+  - name: change dpdk device#1 driver
+    shell: driverctl set-override {{ dpdk_bus.stdout_lines[0] }} uio_pci_generic
+    args:
+     executable: /bin/bash
+
+  - name: change dpdk device#2 driver
+    shell: driverctl set-override {{ dpdk_bus.stdout_lines[1] }} uio_pci_generic
+    args:
+     executable: /bin/bash
+
+  - name: upload selinux modules
+    copy: src=/etc/ansible/files/{{ item }} dest=/tmp owner=root group=root mode=0640
+    with_items:
+      - ovs-vswitchd.pp
+      - ovsdb-server.pp
+
+  - name: install selinux modules
+    shell: semodule -i /tmp/{{ item }}
+    with_items:
+      - ovs-vswitchd.pp
+      - ovsdb-server.pp
+
+  - name: enable isolcpu and hugepages in kernel
+    shell: grep GRUB_CMDLINE_LINUX /etc/default/grub | grep -c "hugepages" || true
+    register: hugepages_status
+    ignore_errors: true
+
+  - name: enable isolcpu in kernel
+    shell: grep GRUB_CMDLINE_LINUX /etc/default/grub | grep -c "isolcpus" || true
+    register: isolcpu_status
+    ignore_errors: true
+
+  - name: Enable isolcpu in grub
+    lineinfile: dest="/etc/default/grub" regexp='GRUB_CMDLINE_LINUX="(.*)"' line='GRUB_CMDLINE_LINUX="\1 isolcpus=2-3"' backrefs=yes
+    when: isolcpu_status.stdout == "0"
+
+  - name: Enable hugepages in grub
+    lineinfile: dest="/etc/default/grub" regexp='GRUB_CMDLINE_LINUX="(.*)"' line='GRUB_CMDLINE_LINUX="\1 hugepages=512"' backrefs=yes
+    when: hugepages_status.stdout == "0"
+
+  - name: modify grub to load hugepages
+    shell: grub2-mkconfig -o /boot/efi/EFI/centos/grub.cfg
+    args:
+     executable: /bin/bash
+
+  - name: check if hugepages fstab entry exist
+    shell: grep "^hugetlbfs" /etc/fstab || true
+    args:
+     executable: /bin/bash
+    register: test_grep
+
+  - name: modify fstab
+    lineinfile:
+     path: /etc/fstab
+     line: 'nodev                   /mnt/huge               hugetlbfs       defaults        0 0'
+    when: test_grep.stdout == ""
+
+  - name: Creates directory
+    file:
+     path: /mnt/huge
+     state: directory
+
+  - name: copy systemd service file to use hugepages on node0
+    copy:
+     src: /etc/ansible/files/hugetlb-gigantic-pages.service
+     dest: /usr/lib/systemd/system/hugetlb-gigantic-pages.service
+     owner: root
+     group: root
+     mode: 0640
+
+  - name: copy bash script file to use hugepages
+    copy:
+     src: /etc/ansible/files/hugetlb-reserve-pages.sh
+     dest: /usr/lib/systemd/hugetlb-reserve-pages.sh
+     owner: root
+     group: root
+     mode: 0750
+
+  - name: modify openvswitch startup users
+    replace:
+     path: /etc/sysconfig/openvswitch
+     regexp: '^OVS_USER_ID(.*)$'
+     replace: 'OVS_USER_ID="root:root"'
+
+  - name: enable and start libvirtd services
+    systemd:
+     state: started
+     enabled: yes
+     daemon_reload: yes
+     name: libvirtd.service
+
+  - name: enable and start chronyd services
+    systemd:
+     state: started
+     enabled: yes
+     daemon_reload: yes
+     name: chronyd.service
+
+
+  - name: enable and start service hugetlb-gigantic-pages
+    systemd:
+     state: started
+     name: hugetlb-gigantic-pages
+     enabled: yes
+     daemon_reload: yes
+
+  - name: enable and start opevswitchd
+    systemd:
+     state: started
+     name: openvswitch
+     enabled: yes
+
+  - name: ovs enable dpdk
+    shell: ovs-vsctl --no-wait set Open_vSwitch . other_config:dpdk-init="true"
+    args:
+     executable: /bin/bash
+
+  - name: ovs dpdk config cpu mask
+    shell: ovs-vsctl --no-wait set Open_vSwitch . other_config:pmd-cpu-mask=0x4
+    args:
+     executable: /bin/bash
+
+  - name: ovs dpdk config memory usage
+    shell: ovs-vsctl --no-wait set Open_vSwitch . other_config:dpdk-socket-mem="1024,0"
+    args:
+     executable: /bin/bash
+
+  - name: config dpdk port
+    shell: ovs-vsctl --may-exist add-br br-dpdk -- set bridge br-dpdk datapath_type=netdev
+    args:
+     executable: /bin/bash
+
+  - name: add dpdk port
+    shell: ovs-vsctl --may-exist add-bond br-dpdk dpdkbond p0 p1 lacp=active bond_mode=balance-tcp
+    args:
+     executable: /bin/bash
+
+  - name: add dpdk port
+    shell: ovs-vsctl set Interface p0 type=dpdk options:dpdk-devargs={{ dpdk_bus.stdout_lines[0] }}
+    args:
+     executable: /bin/bash
+
+  - name: add dpdk port
+    shell: ovs-vsctl set Interface p1 type=dpdk options:dpdk-devargs={{ dpdk_bus.stdout_lines[1] }}
+    args:
+     executable: /bin/bash
+
+  - name: collect old ifcfg-files
+    shell: ls /etc/sysconfig/network-scripts/ | grep ifcfg | grep -v 'ifcfg-lo\|ifcfg-ens1f0\|ens1f1' | awk '{print $1}'
+    args:
+     executable: /bin/bash
+    register: oldint
+
+  - name: delete old interface files
+    file:
+     state: absent
+     path: /etc/sysconfig/network-scripts/{{ item }}
+    loop: "{{oldint.stdout_lines}}"
+    when: oldint.stdout != ""
+
+  - name: cretae ifcfg-{{ firstport.stdout }} network config file
+    template:
+     src: /etc/ansible/files/networks/ifcfg-physicalif01
+     dest: /etc/sysconfig/network-scripts/ifcfg-{{ firstport.stdout }}
+     owner: root
+     group: root
+     mode: 0644
+
+  - name: cretae ifcfg-{{ secondport.stdout }} network config file
+    template:
+     src: /etc/ansible/files/networks/ifcfg-physicalif02
+     dest: /etc/sysconfig/network-scripts/ifcfg-{{ secondport.stdout }}
+     owner: root
+     group: root
+     mode: 0644
+
+  - name: create bond0 network config file
+    template:
+     src: /etc/ansible/files/networks/ifcfg-bond0
+     dest: /etc/sysconfig/network-scripts/ifcfg-bond0
+     owner: root
+     group: root
+     mode: 0644
+
+  - name: cretae main bridge network config file
+    template:
+     src: /etc/ansible/files/networks/ifcfg-br-ext-main
+     dest: /etc/sysconfig/network-scripts/ifcfg-br-ext-main
+     owner: root
+     group: root
+     mode: 0644
+
+  - name: cretae mgmt0 network config file
+    template:
+     src: /etc/ansible/files/networks/ifcfg-mgmt0
+     dest: /etc/sysconfig/network-scripts/ifcfg-mgmt0
+     owner: root
+     group: root
+     mode: 0644
+
+  - name: create int port network config file
+    template:
+     src: /etc/ansible/files/networks/ifcfg-port-int
+     dest: /etc/sysconfig/network-scripts/ifcfg-port-int
+     owner: root
+     group: root
+     mode: 0644
+
+  - name: create tun port network config file
+    template:
+     src: /etc/ansible/files/networks/ifcfg-port-tun
+     dest: /etc/sysconfig/network-scripts/ifcfg-port-tun
+     owner: root
+     group: root
+     mode: 0644
+
+  - name: remove NetworkManager
+    yum:
+     name: NetworkManager*
+     state: absent
+
+  - name: reboot to apply grub changes
+    reboot:

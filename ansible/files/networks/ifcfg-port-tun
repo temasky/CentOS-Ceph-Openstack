@@ -1,0 +1,12 @@
+TYPE=OVSIntPort
+DEVICETYPE=ovs
+DEVICE=port-tun
+ONBOOT=yes
+OVS_BRIDGE=br-dpdk
+OVS_OPTIONS="tag=163"
+BOOTPROTO=static
+OVS_EXTRA="set int $DEVICE mtu_request=9000"
+IPADDR={{ tun_ip.stdout }}
+NOZEROCONF=yes
+PREFIX=24
+HOTPLUG="no"

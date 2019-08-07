@@ -1,0 +1,27 @@
+---
+- hosts: bonchvisors
+  remote_user: cephadmin
+  become: true
+  become_user: root
+  become_method: sudo
+
+  tasks:
+
+  - name: install openstack pike repository
+    yum:
+     name: centos-release-openstack-pike
+     state: latest
+
+  - name: upgrade all packages
+    yum:
+     name: '*'
+     state: latest
+
+
+  - name: install openstack client and selinux lib's
+    yum:
+     name: "{{ packages }}"
+    vars:
+     packages:
+     - python-openstackclient
+     - openstack-selinux

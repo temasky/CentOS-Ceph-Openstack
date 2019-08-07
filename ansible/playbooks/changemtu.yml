@@ -1,0 +1,78 @@
+---
+- hosts: bonchvisors-small
+  remote_user: cephadmin
+  become: true
+  become_user: root
+  become_method: sudo
+
+  tasks:
+#    - name: change MTU in br0 interface
+#      lineinfile:
+#       path: /etc/sysconfig/network-scripts/ifcfg-br0
+#       line: 'MTU=9000'
+#    - name: change MTU in br1 interface
+#      lineinfile:
+#       path: /etc/sysconfig/network-scripts/ifcfg-br1
+#       line: 'MTU=9000'
+    - name: change MTU in bond interface
+      lineinfile:
+       path: /etc/sysconfig/network-scripts/ifcfg-bond0
+       line: 'MTU=9000' 
+#    - name: restart network service
+#      systemd:
+#       state: restarted
+#       daemon_reload: yes
+#       name: network
+    - name: Find 10Gbit network files
+      find:
+       paths: /etc/sysconfig/network-scripts/
+       patterns: "ifcfg-enp*"
+      register: files_matched
+#    - debug:
+#       msg: "{{ files_matched.files[0].path }}"
+
+#    - name: delete unproper ethtool options 1st device
+#      lineinfile:
+#       path: "{{ files_matched.files[0].path }}"
+#       line: '-K ${DEVICE} rx off tx off; -K ${DEVICE} tso off; -K ${DEVICE} gso off'
+#       state: absent
+#
+#    - name: delete unproper ethtool options 2nd device
+#      lineinfile:
+#       path: "{{ files_matched.files[1].path }}"
+#       line: '-K ${DEVICE} rx off tx off; -K ${DEVICE} tso off; -K ${DEVICE} gso off'
+#       state: absent
+
+    - name: copy vlan165 file
+      copy:
+       src: /etc/ansible/files/ifcfg-vlan165
+       dest: /etc/sysconfig/network-scripts/ifcfg-vlan165
+       owner: root
+       group: root
+       mode: 0644
+
+    - name: copy br2 file
+      copy:
+       src: /etc/ansible/files/ifcfg-br2
+       dest: /etc/sysconfig/network-scripts/ifcfg-br2
+       owner: root
+       group: root
+       mode: 0644
+
+    - name: Change ethtool options 1st device
+      lineinfile: 
+       path: "{{ files_matched.files[0].path }}"
+       line: 'ETHTOOL_OPTS="-K ${DEVICE} rx off tx off; -K ${DEVICE} tso off; -K ${DEVICE} gso off"'
+
+    - name: Change ethtool options 2nd device
+      lineinfile: 
+       path: "{{ files_matched.files[1].path }}"
+       line: 'ETHTOOL_OPTS="-K ${DEVICE} rx off tx off; -K ${DEVICE} tso off; -K ${DEVICE} gso off"'
+
+
+
+    - name: restart network service
+      systemd:
+       state: restarted
+       daemon_reload: yes
+       name: network

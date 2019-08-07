@@ -1,0 +1,8 @@
+DEVICE=patch-main-ext01
+ONBOOT=yes
+DEVICETYPE=ovs
+TYPE=OVSPatchPort
+OVS_OPTIONS="tag=160"
+OVS_EXTRA="set int $DEVICE mtu_request=9000"
+OVS_BRIDGE=br-main
+OVS_PATCH_PEER=patch-ext01-main

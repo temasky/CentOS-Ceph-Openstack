@@ -1,0 +1,72 @@
+---
+- hosts: bonchvisors
+  remote_user: cephadmin
+  become: true
+  become_user: root
+  become_method: sudo
+  vars:
+   disk:
+     - sdb
+     - sdc
+     - sdd
+     - sde
+
+  tasks:
+
+   - name: detect lv
+     shell: pvscan | grep ceph | sed -n "1,4p" | awk '{print $4}'
+     args:
+       executable: /bin/bash
+     register: ceph_lv
+
+   - name: detect pv
+     shell: pvscan | grep ceph | sed -n "1,4p" | awk '{print $2}'
+     args:
+       executable: /bin/bash
+     register: ceph_pv
+
+   - name: list PV 
+     debug:
+      msg: "{{ item }}"
+     loop: "{{ceph_pv.stdout_lines}}"
+     when: ceph_pv.stdout != ""
+
+   - name: list mounted ceph volume
+     shell:  mount | grep ceph | grep -v tmpfs | awk '{print $3}'
+     args:
+       executable: /bin/bash
+       warn: false
+     register: ceph_mount
+
+   - name: umount OSD
+     shell: umount {{item}}
+     args:
+      executable: /bin/bash     
+     loop: "{{ceph_mount.stdout_lines}}"
+     when: ceph_lv.stdout != ""
+
+   - name: delete VG
+     lvg:
+      vg: "{{ item }}"
+      state: absent
+      force: yes
+     loop: "{{ceph_lv.stdout_lines}}"
+     when: ceph_lv.stdout != ""
+
+   - name: delete pv
+     shell: pvremove -y {{ item }}
+     args:
+       executable: /bin/bash
+     loop: "{{ceph_pv.stdout_lines}}"
+     when: ceph_pv.stdout != ""
+
+   - name: wipe HDD
+     shell: wipefs -a /dev/{{item}}
+     args:
+      executable: /bin/bash
+     with_items: "{{ disk }}"
+
+   - name: delete partition info
+     shell:  for i in b c d; do dd if=/dev/zero of=/dev/sd$i bs=512 count=1 conv=notrunc; done
+     args:
+       executable: /bin/bash

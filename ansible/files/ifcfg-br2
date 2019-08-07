@@ -1,0 +1,8 @@
+TYPE=Bridge
+NAME=br2
+DEVICE=br2
+ONBOOT=yes
+BOOTPROTO=none
+NOZEROCONF=yes
+ZONE=public
+MTU=9000

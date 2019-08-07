@@ -1,0 +1,24 @@
+---
+- hosts: bonchvisors
+  serial: 11
+  remote_user: cephadmin
+  become: true
+  become_user: root
+  become_method: sudo
+
+  tasks:
+
+   - name: detect osd number in array
+     shell: systemctl list-units --type=service --all | grep osd | awk '{print $1}' | awk -F "@" '{print $2}' | awk -F "." '{print $1}'
+     args:
+       executable: /bin/bash
+     register: osd_num
+
+
+   - name: delete osd
+     shell: ceph osd crush reweight osd.{{item}} 0.0; ceph osd out {{item}}; systemctl stop ceph-osd@{{item}}; ceph osd crush remove osd.{{item}}; ceph auth del osd.{{item}}; ceph osd rm {{item}}
+     args:
+       executable: /bin/bash
+     loop: "{{osd_num.stdout_lines}}"
+     when: osd_num.stdout != ""
+

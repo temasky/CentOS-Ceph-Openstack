@@ -1,0 +1,5 @@
+TYPE=Ethernet
+DEVICE={{ secondport.stdout }}
+ONBOOT=yes
+MTU=9000
+ETHTOOL_OPTS="-K ${DEVICE} rx off tx off; -K ${DEVICE} tso off; -K ${DEVICE} gso off"

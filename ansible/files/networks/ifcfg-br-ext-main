@@ -1,0 +1,7 @@
+DEVICE=br-ext-main
+DEVICETYPE=ovs
+TYPE=OVSBridge
+BOOTPROTO=none
+OVS_EXTRA="set int $DEVICE mtu_request=9000"
+ONBOOT=yes
+HOTPLUG=no

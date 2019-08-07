@@ -1,0 +1,145 @@
+---
+- hosts: bonchvisors
+  remote_user: cephadmin
+  become: true
+  become_user: root
+  become_method: sudo
+
+  tasks:
+
+#  - name: install openstack nova compute elements
+#    yum:
+#     name: "{{ packages }}"
+#     state: latest
+#    vars:
+#     packages:
+#     - openstack-neutron-linuxbridge
+#     - ebtables
+#     - ipset
+#     - openstack-nova-compute
+#     - openstack-neutron-ml2
+#     - openstack-neutron-openvswitch
+
+
+  - name: install snmp tool
+    yum:
+     name: "net-snmp"
+     state: latest
+
+
+#  - name: restart openvswitch services
+#    systemd:
+#     state: restarted
+#     enabled: yes
+#     daemon_reload: yes
+#     name: openvswitch.service
+
+  - name: get public ip address
+    shell: echo 172.17.2.$((50+$(echo $HOSTNAME | awk -F "bonchvisor" '{print $2}' | sed 's/^0*//')))
+    args:
+     executable: /bin/bash
+    register: public_ip
+
+  - name: get private ip address
+    shell: echo 172.17.3.$((50+$(echo $HOSTNAME | awk -F "bonchvisor" '{print $2}' | sed 's/^0*//')))
+    args:
+     executable: /bin/bash
+    register: private_ip
+
+  - name: get tunnel ip address
+    shell: echo 172.17.1.$((50+$(echo $HOSTNAME | awk -F "bonchvisor" '{print $2}' | sed 's/^0*//')))
+    args:
+     executable: /bin/bash
+    register: tunnel_ip
+
+#  - name: create neutron config file
+#    template:
+#     src: /etc/ansible/files/openvswitch_agent.ini
+#     dest: /etc/neutron/plugins/ml2/openvswitch_agent.ini
+#     owner: root
+#     group: root
+#     mode: 0644
+
+# add snmp firewall port
+
+  - firewalld:
+     immediate: yes
+     port: 161/udp
+     permanent: true
+     state: enabled
+
+  - name: create snmpd config file
+    template:
+     src: /etc/ansible/files/snmpd.conf
+     dest: /etc/snmp/snmpd.conf
+     owner: root
+     group: root
+     mode: 0644
+
+  - name: create nova config file
+    template:
+     src: /etc/ansible/files/nova.conf
+     dest: /etc/nova/nova.conf
+     owner: root
+     group: root
+     mode: 0644
+
+  - name: create neutron config file
+    template:
+     src: /etc/ansible/files/neutron.conf
+     dest: /etc/neutron/neutron.conf
+     owner: root
+     group: root
+     mode: 0644
+
+  - name: create ml2_conf.ini file
+    template:
+     src: /etc/ansible/files/ml2_conf.ini
+     dest: /etc/neutron/plugins/ml2/ml2_conf.ini
+     owner: root
+     group: root
+     mode: 0644
+
+  - name: create openvswitch_agent.ini file
+    template:
+     src: /etc/ansible/files/openvswitch_agent.ini
+     dest: /etc/neutron/plugins/ml2/openvswitch_agent.ini
+     owner: root
+     group: root
+     mode: 0644
+
+  - name: create ceilometer config file
+    template:
+     src: /etc/ansible/files/ceilometer.conf
+     dest: /etc/ceilometer/ceilometer.conf
+     owner: root
+     group: root
+     mode: 0644
+
+  - name: restart openstack-ceilometer-compute
+    systemd:
+     state: restarted
+     enabled: yes
+     daemon_reload: yes
+     name: openstack-ceilometer-compute
+
+  - name: restart openstack-nova-compute
+    systemd:
+     state: restarted
+     enabled: yes
+     daemon_reload: yes
+     name: openstack-nova-compute
+
+  - name: restart neutron-openvswitch-agent
+    systemd:
+     state: restarted
+     enabled: yes
+     daemon_reload: yes
+     name: neutron-openvswitch-agent
+
+  - name: restart snmpd
+    systemd:
+     state: restarted
+     enabled: yes
+     daemon_reload: yes
+     name: snmpd

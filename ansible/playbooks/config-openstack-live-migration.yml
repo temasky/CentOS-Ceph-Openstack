@@ -1,0 +1,37 @@
+---
+- hosts: bonchvisors
+  remote_user: cephadmin
+  become: true
+  become_user: root
+  become_method: sudo
+
+  tasks:
+
+  - name: create libvirtd.conf file
+    template:
+     src: /etc/ansible/files/libvirtd.conf
+     dest: /etc/libvirt/libvirtd.conf
+     owner: root
+     group: root
+     mode: 0644    
+
+  - name: cretae libvirtd file for port listening
+    template:
+     src: /etc/ansible/files/libvirtd
+     dest: /etc/sysconfig/libvirtd
+     owner: root
+     group: root
+     mode: 0644
+
+  - name: cretae firewalld rule
+    shell: firewall-cmd --add-port 49152-49216/tcp --permanent; firewall-cmd --add-port 16509/tcp --permanent; firewall-cmd --reload
+    args:
+     executable: /bin/bash
+
+  - name: restart libvirtd
+    systemd:
+     state: restarted
+     enabled: yes
+     daemon_reload: yes
+     name: libvirtd.service
+

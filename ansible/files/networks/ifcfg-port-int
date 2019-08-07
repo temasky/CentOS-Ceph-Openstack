@@ -1,0 +1,12 @@
+TYPE=OVSIntPort
+DEVICETYPE=ovs
+DEVICE=port-int
+ONBOOT=yes
+OVS_BRIDGE=br-ext-main
+OVS_OPTIONS="tag=162"
+BOOTPROTO=static
+OVS_EXTRA="set int $DEVICE mtu_request=9000"
+IPADDR={{ private_ip.stdout }}
+NOZEROCONF=yes
+PREFIX=24
+HOTPLUG="no"

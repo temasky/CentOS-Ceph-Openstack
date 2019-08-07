@@ -1,0 +1,71 @@
+# This is the default ansible 'hosts' file.
+#
+# It should live in /etc/ansible/hosts
+#
+#   - Comments begin with the '#' character
+#   - Blank lines are ignored
+#   - Groups of hosts are delimited by [header] elements
+#   - You can enter hostnames or ip addresses
+#   - A hostname/ip can be a member of multiple groups
+
+# Ex 1: Ungrouped hosts, specify before any group headers.
+
+## green.example.com
+## blue.example.com
+## 192.168.100.1
+## 192.168.100.10
+
+# Ex 2: A collection of hosts belonging to the 'webservers' group
+
+## [webservers]
+## alpha.example.org
+## beta.example.org
+## 192.168.1.100
+## 192.168.1.110
+
+# If you have multiple hosts following a pattern you can specify
+# them like this:
+
+## www[001:006].example.com
+
+# Ex 3: A collection of database servers in the 'dbservers' group
+
+## [dbservers]
+## 
+## db01.intranet.mydomain.net
+## db02.intranet.mydomain.net
+## 10.25.1.56
+## 10.25.1.57
+
+# Here's another example of host ranges, this time there are no
+# leading 0s:
+
+## db-[99:101]-node.example.com
+
+[bonchvisors]
+bonchvisor04 ansible_ssh_host=172.17.2.54 ansible_user=cephadmin
+bonchvisor05 ansible_ssh_host=172.17.2.55 ansible_user=cephadmin
+bonchvisor06 ansible_ssh_host=172.17.2.56 ansible_user=cephadmin
+bonchvisor07 ansible_ssh_host=172.17.2.57 ansible_user=cephadmin
+bonchvisor08 ansible_ssh_host=172.17.2.58 ansible_user=cephadmin
+bonchvisor09 ansible_ssh_host=172.17.2.59 ansible_user=cephadmin
+bonchvisor10 ansible_ssh_host=172.17.2.60 ansible_user=cephadmin
+bonchvisor11 ansible_ssh_host=172.17.2.61 ansible_user=cephadmin
+bonchvisor12 ansible_ssh_host=172.17.2.62 ansible_user=cephadmin
+
+[bonchvisors-small]
+bonchvisor05 ansible_ssh_host=172.17.2.55
+bonchvisor06 ansible_ssh_host=172.17.2.56
+bonchvisor07 ansible_ssh_host=172.17.2.57
+bonchvisor08 ansible_ssh_host=172.17.2.58
+bonchvisor09 ansible_ssh_host=172.17.2.59
+bonchvisor10 ansible_ssh_host=172.17.2.60
+bonchvisor11 ansible_ssh_host=172.17.2.61
+bonchvisor12 ansible_ssh_host=172.17.2.62
+
+[bonchvisor-dpdk]
+
+[controllers]
+controller-ceph ansible_ssh_host=172.17.2.50
+controller-virt ansible_ssh_host=172.17.2.100
+controller-net ansible_ssh_host=172.17.2.200

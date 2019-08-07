@@ -1,0 +1,150 @@
+---
+- hosts: bonchvisor14
+  remote_user: cephadmin
+  become: true
+  become_user: root
+  become_method: sudo
+
+  tasks:
+
+  - name: install openstack nova compute elements
+    yum:
+     name: "{{ packages }}"
+     state: latest
+    vars:
+     packages:
+     - openstack-neutron-linuxbridge
+     - ebtables
+     - ipset
+     - openstack-nova-compute
+     - openstack-neutron-ml2
+     - openstack-neutron-openvswitch
+
+  - name: get public ip address
+    shell: echo 172.17.2.$((50+$(echo $HOSTNAME | awk -F "bonchvisor" '{print $2}' | sed 's/^0*//')))
+    args:
+     executable: /bin/bash
+    register: public_ip
+
+  - name: get private ip address
+    shell: echo 172.17.3.$((50+$(echo $HOSTNAME | awk -F "bonchvisor" '{print $2}' | sed 's/^0*//')))
+    args:
+     executable: /bin/bash
+    register: private_ip
+
+
+  - name: copy secret.xml file
+    copy:
+      src: /etc/ansible/files/secret.xml
+      dest: /etc/ceph/secret.xml
+      owner: root
+      group: root
+      mode: 0640
+
+  - name: copy ceph.client.vms.keyring file
+    copy:
+      src: /etc/ansible/files/ceph.client.vms.keyring
+      dest: /etc/ceph/ceph.client.vms.keyring
+      owner: root
+      group: nova
+      mode: 0640
+
+  - name: copy client.cinder.key file
+    copy:
+      src: /etc/ansible/files/client.cinder.key
+      dest: /etc/ceph/client.cinder.key
+      owner: root
+      group: root
+      mode: 0640
+
+  - name: copy vms-secret.xml file
+    copy:
+      src: /etc/ansible/files/vms-secret.xml
+      dest: /etc/ceph/vms-secret.xml
+      owner: root
+      group: root
+      mode: 0640
+
+  - name: copy client.vms.key file
+    copy:
+      src: /etc/ansible/files/client.vms.key
+      dest: /etc/ceph/client.vms.key
+      owner: root
+      group: root
+      mode: 0640
+
+  - name: create openvswitch_agent.ini
+    template:
+     src: /etc/ansible/files/openvswitch_agent.ini
+     dest: /etc/neutron/plugins/ml2/openvswitch_agent.ini
+     owner: root
+     group: neutron
+     mode: 0644
+
+  - name: create nova.conf
+    template:
+     src: /etc/ansible/files/nova.conf
+     dest: /etc/nova/nova.conf
+     owner: root
+     group: nova
+     mode: 0640
+
+  - name: create neutron.conf
+    template:
+     src: /etc/ansible/files/neutron.conf
+     dest: /etc/nova/neutron.conf
+     owner: root
+     group: neutron
+     mode: 0640
+
+  - name: virsh secret define
+    shell: virsh secret-define --file /etc/ceph/secret.xml
+    args:
+     executable: /bin/bash
+    register: required_uuid
+
+  - name: virsh secret set
+    shell: virsh secret-set-value --secret $(echo {{required_uuid.stdout }} | awk '{print $2}') --base64 $(cat /etc/ceph/client.cinder.key)
+    args:
+     executable: /bin/bash
+
+  - name: virsh vms secret define
+    shell: virsh secret-define --file /etc/ceph/vms-secret.xml
+    args:
+     executable: /bin/bash
+    register: required_vms_uuid
+
+  - name: virsh vms secret set
+    shell: virsh secret-set-value --secret $(echo {{ required_vms_uuid.stdout }} | awk '{print $2}') --base64 $(cat /etc/ceph/client.vms.key)
+    args:
+     executable: /bin/bash
+
+  - name: restart libvirtd services
+    systemd:
+     state: restarted
+     enabled: yes
+     daemon_reload: yes
+     name: libvirtd.service
+
+  - name: restart nova-compute services
+    systemd:
+     state: restarted
+     enabled: yes
+     daemon_reload: yes
+     name: openstack-nova-compute.service
+
+  - name: restart neutron-linux-brigde-agent services
+    systemd:
+     state: stopped
+     enabled: no
+     daemon_reload: yes
+     name: neutron-linuxbridge-agent.service
+
+  - name: restart neutron-openvswitch-agent services
+    systemd:
+     state: restarted
+     enabled: yes
+     daemon_reload: yes
+     name: neutron-openvswitch-agent.service
+
+
