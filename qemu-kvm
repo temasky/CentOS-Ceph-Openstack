@@ -3,7 +3,7 @@ import os
 import sys
 import re
 
-new_args = []
+new_args = ['/usr/libexec/qemu-kvm.origin']
 flag = 0
 
 for i in range(1,len(sys.argv)+1):
