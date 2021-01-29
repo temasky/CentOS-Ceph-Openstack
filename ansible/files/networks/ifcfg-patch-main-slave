@@ -1,7 +1,0 @@
-DEVICE=patch-main-slave
-ONBOOT=yes
-DEVICETYPE=ovs
-TYPE=OVSPatchPort
-OVS_EXTRA="set int $DEVICE mtu_request=9000"
-OVS_BRIDGE=br-ext-main
-OVS_PATCH_PEER=patch-slave-main
